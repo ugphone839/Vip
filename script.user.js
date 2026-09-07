@@ -2114,8 +2114,10 @@
     'use strict';
     const CURRENT_HOST = window.location.hostname;
 
-    // --- MODULE: GIẢI CAPTCHA OCTOLINK ---
-    if (CURRENT_HOST.includes('octolink.vip')) {
+    // --- MODULE: GIẢI CAPTCHA HOLD (di chuột) ---
+    // Gắn hook + solver trên mọi trang script chạy; chỉ active khi tìm thấy canvas captcha
+    if (true) {
+
         if (!window.__antigravity_shadow_hooked) {
           window.__antigravity_shadow_hooked = true;
           window.__all_shadow_roots = new Set();
@@ -2327,16 +2329,28 @@
               canvas.dispatchEvent(new MouseEvent('mousemove', opts));
               document.dispatchEvent(new PointerEvent('pointermove', opts));
               document.dispatchEvent(new MouseEvent('mousemove', opts));
+              // Mobile touch move
+              try {
+                var te = new TouchEvent('touchmove', { bubbles: true, cancelable: true, composed: true });
+                canvas.dispatchEvent(te);
+              } catch (e) {
+                try {
+                  canvas.dispatchEvent(new Event('touchmove', { bubbles: true, cancelable: true }));
+                } catch (e2) {}
+              }
             }
           }, 5);
+          try { console.log('[ShadowVortex][Captcha] solver loop started on canvas', canvas.width, 'x', canvas.height); } catch (e) {}
         }
         window.startHoldCaptchaSolver = function (canvasInput) {
+          try { console.log('[ShadowVortex][Captcha] startHoldCaptchaSolver'); } catch (e) {}
           if (canvasInput) {
             runSolverWithCanvas(canvasInput);
             return true;
           }
           const direct = findCanvasAuto();
           if (direct) {
+            try { console.log('[ShadowVortex][Captcha] canvas found immediately', direct.width, direct.height); } catch (e) {}
             runSolverWithCanvas(direct);
             return true;
           }
@@ -2346,18 +2360,37 @@
             const canvas = findCanvasAuto();
             if (canvas) {
               clearInterval(window.__captchaPollingTimer);
+              try { console.log('[ShadowVortex][Captcha] canvas found after poll', attempts, canvas.width, canvas.height); } catch (e) {}
               runSolverWithCanvas(canvas);
-            } else if (++attempts > 50) {
+            } else if (++attempts > 200) {
               clearInterval(window.__captchaPollingTimer);
+              try { console.log('[ShadowVortex][Captcha] timeout – không thấy canvas'); } catch (e) {}
             }
           }, 200);
           return false;
         };
-        if (document.readyState === 'loading') {
-          window.addEventListener('DOMContentLoaded', () => { window.startHoldCaptchaSolver(); });
-        } else {
+        function bootHoldCaptcha() {
           window.startHoldCaptchaSolver();
+          // Bắt thêm khi DOM đổi (SPA / captcha lazy load)
+          try {
+            if (!window.__holdCaptchaMO && typeof MutationObserver !== 'undefined') {
+              window.__holdCaptchaMO = new MutationObserver(function () {
+                if (window.__holdCaptchaDone) return;
+                var c = findCanvasAuto();
+                if (c && !c.__solver_running) runSolverWithCanvas(c);
+              });
+              window.__holdCaptchaMO.observe(document.documentElement || document.body, { childList: true, subtree: true });
+            }
+          } catch (e) {}
         }
+        if (document.readyState === 'loading') {
+          window.addEventListener('DOMContentLoaded', bootHoldCaptcha);
+        } else {
+          bootHoldCaptcha();
+        }
+        // Mobile: thử lại sau 1s / 3s
+        setTimeout(bootHoldCaptcha, 1000);
+        setTimeout(bootHoldCaptcha, 3000);
     }
 
     // --- MODULE: WIDGET ĐIỀU HƯỚNG LINK ---
