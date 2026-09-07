@@ -14,6 +14,7 @@
 // @grant        GM_addStyle
 // @connect      octolink.vip
 // @connect      api.github.com
+// @connect      raw.githubusercontent.com
 // @connect      trafficvip.vip
 // @run-at       document-start
 // ==/UserScript==
@@ -375,34 +376,59 @@
 
         // ===== BLACKLIST CHECK =====
         (function checkBlacklist(code) {
-          if (!_0x181d3f) return;
-          GM_xmlhttpRequest({
-            method: "GET",
-            url: "https://api.github.com/repos/" + _0x39017b + "/contents/" + _0xblacklistFile + "?t=" + Date.now(),
-            headers: {
-              Authorization: "token " + _0x181d3f,
-              Accept: "application/vnd.github.v3+json"
-            },
-            onload: function (res) {
-              if (res.status !== 200) return;
-              try {
-                var meta = JSON.parse(res.responseText);
-                if (!meta.content) return;
-                var raw = atob(meta.content.replace(/\n/g, ""));
-                var data = JSON.parse(raw);
-                var list = data.codes || data.blacklist || [];
-                // Hỗ trợ cả "237" lẫn "237-2"
-                var baseCode = code.split("-")[0];
-                var isBlocked = list.some(function (item) {
-                  return item === code || item === baseCode || String(item) === code || String(item) === baseCode;
-                });
-                if (isBlocked) {
-                  console.log("%c[ShadowVortex] mã này đã bị blacklist: " + code, "color:#ef4444;font-weight:bold;font-size:14px");
-                  _0xe6fadd("⚠ Mã [" + code + "] đã bị blacklist", "error");
+          if (!code) return;
+          function applyBL(data) {
+            try {
+              var list = data.codes || data.blacklist || (Array.isArray(data) ? data : []);
+              var baseCode = String(code).split("-")[0];
+              var isBlocked = list.some(function (item) {
+                return item === code || item === baseCode || String(item) === String(code) || String(item) === baseCode;
+              });
+              if (isBlocked) {
+                console.log("%c[ShadowVortex] mã này đã bị blacklist: " + code, "color:#ef4444;font-weight:bold;font-size:14px");
+                _0xe6fadd("⚠ Mã [" + code + "] đã bị blacklist", "error");
+              }
+            } catch (e) {}
+          }
+          function rawBL(url, next) {
+            GM_xmlhttpRequest({
+              method: "GET",
+              url: url,
+              headers: { Accept: "application/json,text/plain,*/*", "User-Agent": "ShadowVortex" },
+              onload: function (res) {
+                if (res.status === 200 && res.responseText) {
+                  try { applyBL(JSON.parse(res.responseText)); return; } catch (e) {}
                 }
-              } catch (e) {}
-            }
-          });
+                if (typeof next === "function") next();
+              },
+              onerror: function () { if (typeof next === "function") next(); },
+              ontimeout: function () { if (typeof next === "function") next(); }
+            });
+          }
+          function apiBL() {
+            if (!_0x181d3f) return;
+            GM_xmlhttpRequest({
+              method: "GET",
+              url: "https://api.github.com/repos/" + _0x39017b + "/contents/" + _0xblacklistFile + "?t=" + Date.now(),
+              headers: {
+                Authorization: "token " + _0x181d3f,
+                Accept: "application/vnd.github.v3+json",
+                "User-Agent": "ShadowVortex"
+              },
+              onload: function (res) {
+                if (res.status !== 200) return;
+                try {
+                  var meta = JSON.parse(res.responseText);
+                  if (!meta.content) return;
+                  var raw = atob(meta.content.replace(/\n/g, ""));
+                  applyBL(JSON.parse(raw));
+                } catch (e) {}
+              }
+            });
+          }
+          var u1 = "https://raw.githubusercontent.com/" + _0x39017b + "/main/" + _0xblacklistFile + "?t=" + Date.now();
+          var u2 = "https://raw.githubusercontent.com/" + _0x39017b + "/master/" + _0xblacklistFile + "?t=" + Date.now();
+          rawBL(u1, function () { rawBL(u2, apiBL); });
         })(_0x16f244);
         // ===== END BLACKLIST =====
 
@@ -438,53 +464,126 @@
       }
     }
     function _0x24b393(_0x455b05) {
-      if (!_0x181d3f) {
-        _0xe6fadd("Thiếu cấu hình Token GitHub. Chuyển sang nhập tay.", "error");
-        return _0x26b414();
-      }
-      _0xe6fadd("Đang kết nối API thời gian thực để lấy dữ liệu đám mây...", "system");
-      GM_xmlhttpRequest({
-        method: "GET",
-        url: "https://api.github.com/repos/" + _0x39017b + "/contents/" + _0x11a4fd + "?t=" + new Date().getTime(),
-        headers: {
-          Authorization: "token " + _0x181d3f,
-          Accept: "application/vnd.github.v3+json"
-        },
-        onload: function (_0x539571) {
-          if (_0x539571.status !== 200) {
-            _0xe6fadd("Lấy dữ liệu thất bại từ GitHub. Kích hoạt nhập thủ công.", "error");
+      _0xe6fadd("Đang lấy domain từ GitHub (raw)...", "system");
+      var rawUrl = "https://raw.githubusercontent.com/" + _0x39017b + "/main/" + _0x11a4fd + "?t=" + Date.now();
+      var rawUrlMaster = "https://raw.githubusercontent.com/" + _0x39017b + "/master/" + _0x11a4fd + "?t=" + Date.now();
+
+      function handleMap(mapObj) {
+        try {
+          if (!mapObj) {
+            _0xe6fadd("File link.json rỗng / không parse được.", "error");
             return _0x26b414();
           }
-          try {
-            var _0x25a3ab = JSON.parse(_0x539571.responseText);
-            if (_0x25a3ab.content) {
-              var _0x159161 = _0x5605ae(_0x25a3ab.content);
-              var _0x43c701 = JSON.parse(_0x159161);
-              if (_0x43c701.enabled && _0x43c701.redirects[_0x455b05]) {
-                var _0x1681ab = _0x43c701.redirects[_0x455b05];
-                _0xe6fadd("Phát hiện bản lưu đám mây: " + _0x1681ab, "success");
-                _0x9f4d67(_0x1681ab.startsWith("http") ? _0x1681ab : "https://" + _0x1681ab, "cache", null);
-              } else {
-                _0xe6fadd("Nhiệm vụ mới hoàn toàn. Kích hoạt chế độ nhập thủ công.", "warn");
-                _0x26b414();
-              }
-            } else {
-              _0xe6fadd("Cấu trúc file GitHub không hợp lệ.", "error");
-              _0x26b414();
-            }
-          } catch (_0x583ba1) {
-            _0xe6fadd("Lỗi phân tích cú pháp dữ liệu JSON.", "error");
+          // Hỗ trợ 2 format:
+          // A) { enabled: true, redirects: { "157-2": "domain.com" } }
+          // B) { "157-2": "domain.com" }  (flat)
+          var redirects = null;
+          if (mapObj.redirects && typeof mapObj.redirects === "object") {
+            redirects = mapObj.redirects;
+          } else {
+            redirects = mapObj;
+          }
+          var key = String(_0x455b05 || "");
+          var domain = redirects[key];
+          // thử không có suffix -2
+          if (!domain && key.indexOf("-") > 0) {
+            domain = redirects[key.split("-")[0]];
+          }
+          if (domain) {
+            _0xe6fadd("Phát hiện bản lưu đám mây: " + domain, "success");
+            _0x9f4d67(String(domain).startsWith("http") ? domain : "https://" + domain, "cache", null);
+          } else {
+            _0xe6fadd("Chưa có mã [" + key + "] trên GitHub. Nhập tay domain.", "warn");
             _0x26b414();
           }
-        },
-        onerror: function () {
-          _0xe6fadd("Mất kết nối với máy chủ API GitHub.", "error");
-          _0x26b414();
-        },
-        ontimeout: function () {
-          _0xe6fadd("Quá thời gian kết nối API GitHub.", "error");
+        } catch (e) {
+          _0xe6fadd("Lỗi xử lý map: " + (e && e.message ? e.message : e), "error");
           _0x26b414();
         }
+      }
+
+      function tryApiFallback() {
+        if (!_0x181d3f) {
+          _0xe6fadd("Raw fail & không có Token → nhập tay.", "error");
+          return _0x26b414();
+        }
+        _0xe6fadd("Thử API GitHub (token)...", "system");
+        GM_xmlhttpRequest({
+          method: "GET",
+          url: "https://api.github.com/repos/" + _0x39017b + "/contents/" + _0x11a4fd + "?t=" + Date.now(),
+          headers: {
+            Authorization: "token " + _0x181d3f,
+            Accept: "application/vnd.github.v3+json",
+            "User-Agent": "ShadowVortex"
+          },
+          onload: function (res) {
+            if (res.status !== 200) {
+              _0xe6fadd("API GitHub lỗi HTTP " + res.status + " (token có thể hết hạn).", "error");
+              return _0x26b414();
+            }
+            try {
+              var meta = JSON.parse(res.responseText);
+              if (!meta.content) {
+                _0xe6fadd("API không có content.", "error");
+                return _0x26b414();
+              }
+              var raw = _0x5605ae(meta.content);
+              handleMap(JSON.parse(raw));
+            } catch (e) {
+              _0xe6fadd("Lỗi parse API: " + (e && e.message ? e.message : e), "error");
+              _0x26b414();
+            }
+          },
+          onerror: function () {
+            _0xe6fadd("Mất kết nối API GitHub.", "error");
+            _0x26b414();
+          },
+          ontimeout: function () {
+            _0xe6fadd("Timeout API GitHub.", "error");
+            _0x26b414();
+          }
+        });
+      }
+
+      function fetchRaw(url, next) {
+        GM_xmlhttpRequest({
+          method: "GET",
+          url: url,
+          headers: {
+            Accept: "application/json,text/plain,*/*",
+            "User-Agent": "ShadowVortex"
+          },
+          onload: function (res) {
+            if (res.status === 200 && res.responseText && res.responseText.length > 2) {
+              try {
+                handleMap(JSON.parse(res.responseText));
+              } catch (e) {
+                _0xe6fadd("JSON raw lỗi: " + (e && e.message ? e.message : e), "error");
+                if (typeof next === "function") next();
+                else _0x26b414();
+              }
+            } else {
+              _0xe6fadd("Raw HTTP " + res.status + " → thử nguồn khác...", "warn");
+              if (typeof next === "function") next();
+              else tryApiFallback();
+            }
+          },
+          onerror: function () {
+            _0xe6fadd("Raw network error → thử nguồn khác...", "warn");
+            if (typeof next === "function") next();
+            else tryApiFallback();
+          },
+          ontimeout: function () {
+            _0xe6fadd("Raw timeout → thử nguồn khác...", "warn");
+            if (typeof next === "function") next();
+            else tryApiFallback();
+          }
+        });
+      }
+
+      // main → master → API
+      fetchRaw(rawUrl, function () {
+        fetchRaw(rawUrlMaster, tryApiFallback);
       });
     }
     function _0x39c24f(_0x5d9ad7, _0x3b9f70) {
