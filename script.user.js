@@ -96,7 +96,7 @@
       window.location.href = _0x5cc175;
       return;
     }
-    const _0x181d3f = "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";
+    const _0x181d3f = "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";
     const _0x39017b = "ugphone839/Vip";
     const _0x11a4fd = "link.json";
     const _0xblacklistFile = "blacklist.json";
